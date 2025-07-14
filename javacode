@@ -1,0 +1,129 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class PeriodTrackerApp extends JFrame implements ActionListener {
+
+    private JTextField lastPeriodDateField;
+    private JTextField lastPeriodTimeField;
+    private JComboBox<String> moodBox;
+    private JButton saveButton, predictButton;
+    private JTextArea outputArea;
+
+    private static final String DATA_FILE = "period_data.txt";
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public PeriodTrackerApp() {
+        setTitle("Period Tracker App");
+        setSize(450, 450);
+        setLayout(new BorderLayout());
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        // Top panel
+        JPanel inputPanel = new JPanel(new GridLayout(5, 2, 10, 10));
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        inputPanel.add(new JLabel("Last Period Date (yyyy-MM-dd):"));
+        lastPeriodDateField = new JTextField();
+        inputPanel.add(lastPeriodDateField);
+
+        inputPanel.add(new JLabel("Last Period Time (HH:mm):"));
+        lastPeriodTimeField = new JTextField();
+        inputPanel.add(lastPeriodTimeField);
+
+        inputPanel.add(new JLabel("Mood:"));
+        String[] moods = {"Happy", "Sad", "Irritated", "Crampy", "Energetic"};
+        moodBox = new JComboBox<>(moods);
+        inputPanel.add(moodBox);
+
+        saveButton = new JButton("Save");
+        predictButton = new JButton("Predict Next Period");
+        saveButton.addActionListener(this);
+        predictButton.addActionListener(this);
+        inputPanel.add(saveButton);
+        inputPanel.add(predictButton);
+
+        add(inputPanel, BorderLayout.NORTH);
+
+        // Output area
+        outputArea = new JTextArea();
+        outputArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(outputArea);
+        add(scrollPane, BorderLayout.CENTER);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == saveButton) {
+            saveData();
+        } else if (e.getSource() == predictButton) {
+            predictNextPeriod();
+        }
+    }
+
+    private void saveData() {
+        String dateStr = lastPeriodDateField.getText().trim();
+        String timeStr = lastPeriodTimeField.getText().trim();
+        String mood = (String) moodBox.getSelectedItem();
+
+        if (!dateStr.matches("\\d{4}-\\d{2}-\\d{2}") || !timeStr.matches("\\d{2}:\\d{2}")) {
+            JOptionPane.showMessageDialog(this, "Enter date as yyyy-MM-dd and time as HH:mm.");
+            return;
+        }
+
+        try {
+            LocalDateTime dateTime = LocalDateTime.parse(dateStr + " " + timeStr, formatter);
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(DATA_FILE, true))) {
+                writer.write(dateTime.format(formatter) + "," + mood + "\n");
+                outputArea.append("Saved: " + dateTime.format(formatter) + " with mood " + mood + "\n");
+            }
+        } catch (Exception ex) {
+            outputArea.append("Error: Invalid date/time format.\n");
+        }
+    }
+
+    private void predictNextPeriod() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(DATA_FILE))) {
+            String lastLine = null, line;
+            while ((line = reader.readLine()) != null) {
+                lastLine = line;
+            }
+
+            if (lastLine == null) {
+                outputArea.append("No data available for prediction.\n");
+                return;
+            }
+
+            String[] parts = lastLine.split(",");
+            LocalDateTime lastDateTime = LocalDateTime.parse(parts[0], formatter);
+            String lastMood = parts[1];
+
+            LocalDateTime predictedDateTime = lastDateTime.plusDays(28);
+            outputArea.append("Predicted next period: " + predictedDateTime.format(formatter) + "\n");
+            outputArea.append("Previous mood: " + lastMood + "\n");
+
+            // Simple mood prediction logic
+            String predictedMood = switch (lastMood) {
+                case "Happy" -> "Energetic";
+                case "Sad" -> "Irritated";
+                case "Irritated" -> "Sad";
+                case "Crampy" -> "Normal";
+                default -> "Neutral";
+            };
+            outputArea.append("Predicted mood: " + predictedMood + "\n");
+
+        } catch (IOException ex) {
+            outputArea.append("Error reading data.\n");
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            PeriodTrackerApp app = new PeriodTrackerApp();
+            app.setVisible(true);
+        });
+    }
+}
